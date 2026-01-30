@@ -224,6 +224,14 @@ include("head.inc");
                     </tr>
                   </thead>
                   <tbody>
+                    <tr>
+                      <td colspan="2">
+                        <div class="alert alert-warning" role="alert">
+                          <i class="fa fa-exclamation-triangle"></i>
+                          <?=gettext("Warning: Adding very large CIDR ranges (e.g., /16 or smaller) can overload the firewall and consume significant resources. Use specific IPs or smaller ranges (/24 or larger) when possible.");?>
+                        </div>
+                      </td>
+                    </tr>
 <?php foreach (rtsphelper_forward_list() as $i => $forward): 
                       // Split value for display
                       $pVal = isset($pconfig[$forward]) ? $pconfig[$forward] : '';
