@@ -69,18 +69,10 @@ class ProxyServer:
         clientsock, clientaddr = self.server.accept()
         
         if allowedIP(clientaddr[0], self.perms):
-            forward = Forward().start(self.forward_to[0], self.forward_to[1])
-            if forward:
-                self.clients.append([clientaddr,clientsock,forward])
-                self.pm.addClient(clientaddr)
-                self.input_list.append(clientsock)
-                self.input_list.append(forward)
-                self.channel[clientsock] = forward
-                self.channel[forward] = clientsock
-            else:
-                print("Can't establish connection with remote server.")
-                print("Closing connection with client side", clientaddr)
-                clientsock.close()
+            # Do not allow forward yet. Wait for data to parse destination IP if needed.
+            self.clients.append([clientaddr,clientsock,None])
+            self.pm.addClient(clientaddr)
+            self.input_list.append(clientsock)
         else:
             print("Forbidden client IP")
             clientsock.close()
@@ -99,10 +91,14 @@ class ProxyServer:
             # delete both objects from channel dict
             del self.channel[out]
             del self.channel[self.s]
+        elif self.s in self.input_list:
+            # Client connected efficiently but closed before sending data/establishing forward
+            self.input_list.remove(self.s)
+            self.s.close()
 
         client = None
         for c in self.clients:
-            if c[1] == self.s:
+            if c[1] == self.s or (c[2] is not None and c[2] == self.s):
                 client = c
                 break
         # validate if c exists in clients to prevent a crash
@@ -110,18 +106,80 @@ class ProxyServer:
             self.clients.remove(client)
             self.pm.removeClient(client[0])
 
+    def extract_host(self, data):
+        try:
+            content = data.decode('utf-8', errors='ignore')
+            lines = content.splitlines()
+            if len(lines) > 0:
+                # Request Line: METHOD URI VERSION
+                req_line = lines[0].split()
+                if len(req_line) >= 2:
+                    uri = req_line[1]
+                    if uri.lower().startswith('rtsp://'):
+                        # rtsp://1.2.3.4:554/xxx
+                        rest = uri[7:]
+                        if '/' in rest:
+                            hostport = rest.split('/')[0]
+                        else:
+                            hostport = rest
+                        
+                        if ':' in hostport:
+                            return hostport.split(':')[0]
+                        else:
+                            return hostport
+        except:
+            pass
+        return None
+
     def on_recv(self):
         data = self.data
-        # here we can parse and/or modify the data before send forward
-        self.channel[self.s].send(data)
-        for c in self.clients:
-            if c[1] == self.s:
-                self.parseData(data, c)
-                break
+        
+        if self.s in self.channel:
+            # Connection established, forward data
+            self.channel[self.s].send(data)
+            for c in self.clients:
+                if c[1] == self.s:
+                    self.parseData(data, c)
+                    break 
+        else:
+             # First packet from client. Try to determine destination.
+             target_host = self.extract_host(data)
+             
+             if not target_host:
+                 target_host = self.forward_to[0]
+            
+             if '/' in target_host:
+                 print("Cannot determine target host from RTSP packet and configuration is a CIDR range. Closing.")
+                 self.on_close()
+                 return
+
+             forward = Forward().start(target_host, self.forward_to[1])
+             
+             if forward:
+                self.channel[self.s] = forward
+                self.channel[forward] = self.s
+                self.input_list.append(forward)
+                
+                # Update client structure with forward socket
+                for c in self.clients:
+                    if c[1] == self.s:
+                        c[2] = forward
+                        break
+                
+                forward.send(data)
+                
+                # Parse the initial packet as it might contain transport info
+                for c in self.clients:
+                    if c[1] == self.s:
+                        self.parseData(data, c)
+                        break
+             else:
+                print("Can't establish connection with remote server " + target_host)
+                self.on_close()
 
     def parseData(self, data, client):
         for line in data.splitlines():
-            lineSplit = line.decode().split(':', 1)
+            lineSplit = line.decode('utf-8', errors='ignore').split(':', 1)
             if lineSplit[0] == "Transport":
                 for transportOpt in lineSplit[1].split(';'):
                     if transportOpt.split('=')[0] == "client_port":

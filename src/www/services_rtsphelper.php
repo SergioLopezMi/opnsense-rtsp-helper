@@ -32,8 +32,20 @@ function rtsphelper_validate_forward($forward)
     $fw_array = array();
     $fw_array = explode(':', $forward);
 
-    if (!is_ipaddr($fw_array[0])) {
+    /* validate cidr part if present */
+    $ip_parts = explode('/', $fw_array[0]);
+    if (count($ip_parts) > 2) {
         return false;
+    }
+    
+    if (!is_ipaddr($ip_parts[0])) {
+        return false;
+    }
+
+    if (count($ip_parts) == 2) {
+        if (!is_numeric($ip_parts[1]) || $ip_parts[1] < 1 || $ip_parts[1] > 32) {
+             return false;
+        }
     }
 
     $sub = $fw_array[1];
@@ -76,6 +88,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $input_errors = array();
     $pconfig = $_POST;
+
+    // Reconstruct split fields back into stored format IP[/CIDR]:Port
+    foreach (rtsphelper_forward_list() as $i => $forward) {
+        if (!empty($pconfig[$forward . '_ip'])) {
+             $cidr = "";
+             if (isset($pconfig[$forward . '_cidr']) && $pconfig[$forward . '_cidr'] != '32') {
+                 $cidr = '/' . $pconfig[$forward . '_cidr'];
+             }
+             $port = !empty($pconfig[$forward . '_port']) ? $pconfig[$forward . '_port'] : '554';
+             $pconfig[$forward] = $pconfig[$forward . '_ip'] . $cidr . ':' . $port;
+        }
+    }
 
     /* user permissions validation */
     foreach (rtsphelper_permuser_list() as $i => $permuser) {
@@ -200,7 +224,28 @@ include("head.inc");
                     </tr>
                   </thead>
                   <tbody>
-<?php foreach (rtsphelper_forward_list() as $i => $forward): ?>
+<?php foreach (rtsphelper_forward_list() as $i => $forward): 
+                      // Split value for display
+                      $pVal = isset($pconfig[$forward]) ? $pconfig[$forward] : '';
+                      $val_ip = "";
+                      $val_cidr = "32";
+                      $val_port = "";
+                      
+                      if (!empty($pVal)) {
+                          $parts = explode(':', $pVal);
+                          if (count($parts) >= 1) {
+                              $ipPart = $parts[0];
+                              if (strpos($ipPart, '/') !== false) {
+                                  list($val_ip, $val_cidr) = explode('/', $ipPart);
+                              } else {
+                                  $val_ip = $ipPart;
+                              }
+                          }
+                          if (count($parts) >= 2) {
+                              $val_port = $parts[1];
+                          }
+                      }
+                    ?>
                     <tr>
 <?php if ($i == 1): ?>
                       <td style="width:22%"><a id="help_for_forward" href="#" class="showhelp"><i class="fa fa-info-circle"></i></a> <?=gettext('Entry') . ' ' . $i ?></td>
@@ -208,11 +253,19 @@ include("head.inc");
                       <td style="width:22%"><i class="fa fa-info-circle text-muted"></i> <?=gettext('Entry') . ' ' . $i ?></td>
 <?php endif ?>
                       <td style="width:78%">
-                        <input name="<?= html_safe($forward) ?>" type="text" value="<?= $pconfig[$forward] ?>" />
+                        <div style="display:flex; gap:10px; align-items: center;">
+                            <input name="<?= html_safe($forward) ?>_ip" type="text" value="<?= html_safe($val_ip) ?>" placeholder="IP Network e.g. 172.26.0.0" />
+                            <select name="<?= html_safe($forward) ?>_cidr" class="selectpicker" data-width="auto" data-live-search="true">
+                                <?php for($c=32; $c>=1; $c--): ?>
+                                    <option value="<?=$c?>" <?=$c==$val_cidr?'selected':''?>>/<?=$c?></option>
+                                <?php endfor; ?>
+                            </select>
+                            <input name="<?= html_safe($forward) ?>_port" type="text" value="<?= html_safe($val_port) ?>" placeholder="Port" size="5"/>
+                        </div>
 <?php if ($i == 1): ?>
                         <div class="hidden" data-for="help_for_forward">
-                          <?=gettext("Format: [ip:port]");?><br/>
-                          <?=gettext("Example: 1.2.3.4:554");?>
+                          <?=gettext("Enter the IP or Network, select the CIDR mask, and specify the port (default 554).");?><br/>
+                          <?=gettext("Example: 172.26.0.0 / 16 : 554");?>
                         </div>
 <?php endif ?>
                       </td>
