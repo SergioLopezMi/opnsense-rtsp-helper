@@ -77,7 +77,7 @@ function rtsphelper_permuser_list()
 function rtsphelper_forward_list()
 {
     $ret = array();
-    $count = 253;
+    $count = 10;
 
     for ($i = 1; $i <= $count; $i++) {
         $ret[$i] = "forward{$i}";
