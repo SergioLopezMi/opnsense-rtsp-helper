@@ -146,8 +146,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         foreach (rtsphelper_forward_list() as $forward) {
             $rtsp[$forward] = $pconfig[$forward];
         }
+        
         // sync to config
         $config['installedpackages']['rtsphelper']['config'] = $rtsp;
+        
+        // Clean up old forward entries from XML (forward11-forward253)
+        if (isset($config['installedpackages']['rtsphelper']['config'][0])) {
+            for ($i = 11; $i <= 253; $i++) {
+                $old_forward = "forward{$i}";
+                if (isset($config['installedpackages']['rtsphelper']['config'][0][$old_forward])) {
+                    unset($config['installedpackages']['rtsphelper']['config'][0][$old_forward]);
+                }
+            }
+        }
 
         write_config('Modified RTSP Helper settings');
         rtsphelper_configure_do();
