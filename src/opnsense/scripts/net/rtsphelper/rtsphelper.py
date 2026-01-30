@@ -167,7 +167,6 @@ class PortManager:
 
     def addLocalBinding(self, ip, port, local_port):
         self.localBindings.append([ip, port, local_port])
-        self.applyRules()
 
     def applyRules(self):
         config_rule_1 = 'rdr inet proto tcp from any to {} port {} -> {} port {}\n'
@@ -273,6 +272,9 @@ if __name__ == '__main__':
 
     for forward in config['forward_to']:
         servers.append(ProxyServer(forward[0], forward[1], pm, perms))
+    
+    # Apply rules once after all proxies are created
+    pm.applyRules()
 
     def handle_exit_signal(sig, frame):
         handle_exit()
