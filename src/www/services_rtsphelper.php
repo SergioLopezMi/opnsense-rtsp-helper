@@ -146,8 +146,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         foreach (rtsphelper_forward_list() as $forward) {
             $rtsp[$forward] = $pconfig[$forward];
         }
+        
         // sync to config
         $config['installedpackages']['rtsphelper']['config'] = $rtsp;
+        
+        // Clean up old forward entries from XML (forward11-forward253)
+        if (isset($config['installedpackages']['rtsphelper']['config'][0])) {
+            for ($i = 11; $i <= 253; $i++) {
+                $old_forward = "forward{$i}";
+                if (isset($config['installedpackages']['rtsphelper']['config'][0][$old_forward])) {
+                    unset($config['installedpackages']['rtsphelper']['config'][0][$old_forward]);
+                }
+            }
+        }
 
         write_config('Modified RTSP Helper settings');
         rtsphelper_configure_do();
@@ -224,6 +235,14 @@ include("head.inc");
                     </tr>
                   </thead>
                   <tbody>
+                    <tr>
+                      <td colspan="2">
+                        <div class="alert alert-warning" role="alert">
+                          <i class="fa fa-exclamation-triangle"></i>
+                          <?=gettext("Warning: Adding very large CIDR ranges (e.g., /16 or smaller) can overload the firewall and consume significant resources. Use specific IPs or smaller ranges (/24 or larger) when possible.");?>
+                        </div>
+                      </td>
+                    </tr>
 <?php foreach (rtsphelper_forward_list() as $i => $forward): 
                       // Split value for display
                       $pVal = isset($pconfig[$forward]) ? $pconfig[$forward] : '';

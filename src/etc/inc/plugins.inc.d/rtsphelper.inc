@@ -77,13 +77,67 @@ function rtsphelper_permuser_list()
 function rtsphelper_forward_list()
 {
     $ret = array();
-    $count = 253;
+    $count = 10;
 
     for ($i = 1; $i <= $count; $i++) {
         $ret[$i] = "forward{$i}";
     }
 
     return $ret;
+}
+
+function rtsphelper_expand_cidr($forward_entry)
+{
+    $result = array();
+    
+    // Parse format: IP[/CIDR]:Port
+    $parts = explode(':', $forward_entry);
+    if (count($parts) != 2) {
+        return $result;
+    }
+    
+    $ip_part = $parts[0];
+    $port = $parts[1];
+    
+    // Check if CIDR is present
+    if (strpos($ip_part, '/') === false) {
+        // Single IP, return as-is
+        $result[] = $forward_entry;
+        return $result;
+    }
+    
+    list($network, $cidr) = explode('/', $ip_part);
+    $cidr = intval($cidr);
+    
+    // Calculate number of hosts
+    $host_count = pow(2, 32 - $cidr);
+    
+    // Limit expansion to reasonable sizes to avoid memory issues
+    // For /24 = 256 hosts, /16 = 65536 hosts (might be too much)
+    if ($host_count > 65536) {
+        // Don't expand very large networks, log warning
+        log_error("RTSP Helper: CIDR /{$cidr} is too large to expand ({$host_count} hosts). Skipping.");
+        return $result;
+    }
+    
+    // Convert IP to long
+    $ip_long = ip2long($network);
+    if ($ip_long === false) {
+        return $result;
+    }
+    
+    // Calculate network address
+    $mask = -1 << (32 - $cidr);
+    $network_long = $ip_long & $mask;
+    
+    // Generate all IPs in range
+    for ($i = 0; $i < $host_count; $i++) {
+        $current_ip_long = $network_long + $i;
+        $current_ip = long2ip($current_ip_long);
+        $result[] = "{$current_ip}:{$port}";
+    }
+    
+    return $result;
 }
 
 function rtsphelper_configure_do($verbose = false)
@@ -124,7 +178,11 @@ function rtsphelper_configure_do($verbose = false)
 
     foreach (rtsphelper_forward_list() as $forward) {
         if (!empty($rtsphelper_config[$forward])) {
-            $config_text .= "forward={$rtsphelper_config[$forward]}\n";
+            $forward_entry = $rtsphelper_config[$forward];
+            $expanded_forwards = rtsphelper_expand_cidr($forward_entry);
+            foreach ($expanded_forwards as $expanded) {
+                $config_text .= "forward={$expanded}\n";
+            }
         }
     }
     /* write out the configuration */
