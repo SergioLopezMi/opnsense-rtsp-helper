@@ -47,14 +47,14 @@ function rtsphelper_start()
         return;
     }
 
-    mwexec_bg('/usr/local/bin/python3 /usr/local/opnsense/scripts/net/rtsphelper/rtsphelper.py');
+    shell_exec('/usr/local/bin/python3 /usr/local/opnsense/scripts/net/rtsphelper/rtsphelper.py > /dev/null 2>&1 &');
 }
 
 function rtsphelper_stop()
 {
     killbypid('/var/run/rtsphelper.pid', 'TERM', true);
-    mwexec('/sbin/pfctl -artsphelper -Fr 2>&1 >/dev/null');
-    mwexec('/sbin/pfctl -artsphelper -Fn 2>&1 >/dev/null');
+    shell_exec('/sbin/pfctl -a rtsphelper -Fr >/dev/null 2>&1');
+    shell_exec('/sbin/pfctl -a rtsphelper -Fn >/dev/null 2>&1');
 }
 
 function rtsphelper_configure()
