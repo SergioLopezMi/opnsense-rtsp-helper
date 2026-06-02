@@ -10,7 +10,25 @@ This plugin allows RTSP streams to work behind an OPNsense router. Some ISPs use
 6. Reboot OPNsense
 7. You will find a new menu on Services > RTSP Helper
 
+### Managing the service
+The service can be managed with standard FreeBSD rc commands:
+```bash
+# Start the service
+/usr/local/etc/rc.d/rtsphelper start
+
+# Stop the service
+/usr/local/etc/rc.d/rtsphelper stop
+
+# Restart the service
+/usr/local/etc/rc.d/rtsphelper restart
+
+# Check service status
+/usr/local/etc/rc.d/rtsphelper status
+```
+
+The service will start automatically on boot if enabled in the web interface.
+
 ### Disclaimer
-This software is provided “as is”, and without warranty of any kind. I am not responsible for any damage or malfunction that may occur in your OPNsense installation.
+This software is provided "as is", and without warranty of any kind. I am not responsible for any damage or malfunction that may occur in your OPNsense installation.
 
 This plugin was originally created by [QuentinC](https://github.com/QuentinC). All thanks to his work. I fixed some bugs that it had but I am in no way maintaining this plugin.

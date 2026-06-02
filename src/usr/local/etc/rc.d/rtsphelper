@@ -1,0 +1,70 @@
+#!/bin/sh
+#
+# RTSP Helper startup script
+# Provides automatic startup for RTSP Helper service on OPNsense boot
+#
+
+. /etc/rc.subr
+. /usr/local/etc/rc.subr
+. "/usr/local/etc/inc/plugins.inc.d/rtsphelper.inc"
+
+name="rtsphelper"
+rcvar="rtsphelper_enable"
+command="/usr/local/bin/python3"
+command_args="/usr/local/opnsense/scripts/net/rtsphelper/rtsphelper.py"
+command_background="yes"
+pidfile="/var/run/rtsphelper.pid"
+required_files="/var/etc/rtsphelper.conf"
+
+start_cmd="rtsphelper_do_start"
+stop_cmd="rtsphelper_do_stop"
+status_cmd="rtsphelper_do_status"
+restart_cmd="rtsphelper_do_restart"
+
+rtsphelper_do_start()
+{
+    if ! rtsphelper_enabled; then
+        echo "RTSP Helper is disabled in configuration."
+        return 1
+    fi
+
+    if isvalidpid "${pidfile}"; then
+        echo "RTSP Helper is already running (PID: $(cat ${pidfile}))."
+        return 0
+    fi
+
+    echo "Starting RTSP Helper..."
+    rtsphelper_configure_do
+}
+
+rtsphelper_do_stop()
+{
+    if ! isvalidpid "${pidfile}"; then
+        echo "RTSP Helper is not running."
+        return 0
+    fi
+
+    echo "Stopping RTSP Helper..."
+    rtsphelper_stop
+}
+
+rtsphelper_do_status()
+{
+    if isvalidpid "${pidfile}"; then
+        echo "RTSP Helper is running (PID: $(cat ${pidfile}))."
+        return 0
+    else
+        echo "RTSP Helper is not running."
+        return 1
+    fi
+}
+
+rtsphelper_do_restart()
+{
+    rtsphelper_do_stop
+    sleep 1
+    rtsphelper_do_start
+}
+
+load_rc_config "${name}"
+run_rc_command "$1"
