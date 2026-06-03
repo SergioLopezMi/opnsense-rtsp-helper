@@ -26,7 +26,7 @@ The service can be managed with standard FreeBSD rc commands:
 /usr/local/etc/rc.d/rtsphelper status
 ```
 
-The service will start automatically on boot if enabled in the web interface.
+The service can still be controlled with `/usr/local/etc/rc.d/rtsphelper`, but the installer also creates a watchdog cron entry that checks the service every 2 minutes and starts it again using the plugin's native PHP logic if it is down. This is needed because on some OPNsense systems the process may be terminated later during boot even though manual start works correctly.
 
 ### Disclaimer
 This software is provided "as is", and without warranty of any kind. I am not responsible for any damage or malfunction that may occur in your OPNsense installation.

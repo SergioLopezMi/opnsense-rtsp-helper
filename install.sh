@@ -21,5 +21,13 @@ chmod +x /usr/local/etc/rc.d/rtsphelper
 # Enable service in rc.conf
 sysrc -f /etc/rc.conf.d/rtsphelper rtsphelper_enable=YES
 
+# Install watchdog cron entry if it does not already exist
+CRON_LINE='*/2 * * * * /usr/local/bin/php -r '\''require_once("/usr/local/etc/inc/config.inc"); require_once("/usr/local/etc/inc/util.inc"); require_once("/usr/local/etc/inc/interfaces.inc"); require_once("/usr/local/etc/inc/plugins.inc.d/rtsphelper.inc"); rtsphelper_configure_do();'\'''
+TMP_CRON=$(mktemp)
+crontab -l 2>/dev/null | grep -F -v "$CRON_LINE" > "$TMP_CRON" || true
+printf '%s\n' "$CRON_LINE" >> "$TMP_CRON"
+crontab "$TMP_CRON"
+rm -f "$TMP_CRON"
+
 curl -o /usr/local/www/services_rtsphelper.php $SOURCE/www/services_rtsphelper.php
 curl -o /usr/local/www/status_rtsphelper.php $SOURCE/www/status_rtsphelper.php
